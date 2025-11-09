@@ -1,0 +1,259 @@
+<!doctype html>
+  <html lang="es">
+  <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calendario de Adviento</title>
+<style>
+:root{--bg:#071124;--accent:#fb923c;--card:#0ea5a1}
+body{margin:0;font-family:system-ui, -apple-system, "Segoe UI", Roboto, Arial;background:linear-gradient(180deg,var(--bg),#031121);color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px}
+.wrap{max-width:1100px;width:100%}
+header{text-align:center;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:520px){.grid{grid-template-columns:repeat(3,1fr)}}
+.door{background:rgba(255,255,255,0.04);border-radius:12px;padding:12px;min-height:130px;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column}
+.num{position:absolute;left:10px;top:10px;background:var(--accent);color:#000;padding:6px 8px;border-radius:8px;font-weight:700}
+.locked{filter:grayscale(0.6);opacity:0.28;pointer-events:none}
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:999}
+.modal.open{display:flex}
+.modal-box{background:linear-gradient(180deg,#052430,#072f2f);padding:14px;border-radius:10px;max-width:900px;width:100%}
+.close-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:6px 10px;border-radius:8px;color:#fff;cursor:pointer}
+.caption{margin-top:8px;color:#e6eef0}
+.small{font-size:0.9rem;opacity:0.9}
+.preview-tag{position:absolute;right:10px;top:10px;background:rgba(255,255,255,0.04);padding:4px 8px;border-radius:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Calendario de Adviento 1–24</h1>
+    <p class="small">Zona horaria: Madrid (Europe/Madrid). Añade <code>?preview=1</code> para pruebas.</p>
+  </header>
+
+  <div id="grid" class="grid"></div>
+
+  <div style="text-align:center;margin-top:12px" class="small">Sube archivos a <code>/assets/</code> o usa <code>manifest.json</code> para rutas externas.</div>
+</div>
+
+<!-- Modal -->
+<div id="modal" class="modal" role="dialog" aria-hidden="true">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <strong id="modalTitle">Día</strong>
+      <div>
+        <button id="downloadBtn" class="close-btn">Abrir archivo</button>
+        <button id="closeBtn" class="close-btn">Cerrar</button>
+      </div>
+    </div>
+
+    <div id="modalBody"></div>
+    <div id="modalCaption" class="caption"></div>
+  </div>
+</div>
+
+<script>
+const TOTAL = 24;
+const ASSET_PATH = 'assets';
+const grid = document.getElementById('grid');
+const urlParams = new URLSearchParams(location.search);
+const preview = urlParams.get('preview') === '1';
+
+// función para obtener fecha Madrid desde servidor Netlify (opcional). Si falla, usa cliente.
+async function getServerMadridDay(){
+  try{
+    const res = await fetch('/.netlify/functions/serverDate');
+    if(!res.ok) throw new Error('no server date');
+    const j = await res.json();
+    // espera j.madrid como ISO o parseable
+    const d = new Date(j.madrid);
+    if(isNaN(d)) return null;
+    return d.getDate();
+  }catch(e){
+    return null;
+  }
+}
+
+// función que construye fecha Madrid en cliente (fallback)
+function getClientMadridDay(){
+  try{
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid', day:'2-digit', month:'2-digit', year:'numeric', hour:'numeric'}).formatToParts(now);
+    const map = {};
+    parts.forEach(p=>map[p.type]=p.value);
+    const day = parseInt(map.day,10);
+    return day;
+  }catch(e){
+    return new Date().getDate();
+  }
+}
+
+// intenta cargar manifest.json/captions.json (si existen)
+async function loadOptionalJson(path){
+  try{
+    const r = await fetch(path);
+    if(!r.ok) return null;
+    return await r.json();
+  }catch(e){
+    return null;
+  }
+}
+
+(async function init(){
+  const manifest = await loadOptionalJson('manifest.json'); // puede mapear día->tipo/src
+  const captions = await loadOptionalJson('captions.json');
+
+  // decide el día actual: servidor (si disponible) o cliente
+  let currentDay = null;
+  if(!preview){
+    const serverDay = await getServerMadridDay();
+    currentDay = serverDay || getClientMadridDay();
+  } else {
+    currentDay = TOTAL;
+  }
+
+  for(let i=1;i<=TOTAL;i++){
+    const div = document.createElement('div');
+    div.className = 'door';
+    div.dataset.day = i;
+    if(i > currentDay) div.classList.add('locked');
+
+    div.innerHTML = `<div class="num">${i}</div>
+      <div style="text-align:center">
+        <div style="font-weight:700">${i<=currentDay?'Abierto':'Bloqueado'}</div>
+        <div class="small" style="margin-top:8px">${i<=currentDay?'Haz click para ver':'Disponible el '+i+' dic'}</div>
+      </div>`;
+
+    div.addEventListener('click', ()=> openDoor(i, manifest, captions));
+    grid.appendChild(div);
+  }
+})();
+
+// helper: comprueba si una URL existe (GET con HEAD preferido)
+async function exists(url){
+  try{
+    const r = await fetch(url, {method:'HEAD'});
+    return r.ok;
+  }catch(e){
+    // fallback: intenta GET pequeño
+    try{
+      const r2 = await fetch(url);
+      return r2.ok;
+    }catch(e2){
+      return false;
+    }
+  }
+}
+
+async function openDoor(day, manifest, captions){
+  if(!preview){
+    // recalcular día cliente por si ha pasado medianoche
+    const clientDay = getClientMadridDay();
+    if(day > clientDay){
+      alert('Esta casilla aún no está disponible.');
+      return;
+    }
+  }
+
+  const modal = document.getElementById('modal');
+  const modalBody = document.getElementById('modalBody');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalCaption = document.getElementById('modalCaption');
+  modal.classList.add('open'); modal.setAttribute('aria-hidden','false');
+  modalTitle.textContent = `Día ${day}`;
+  modalBody.innerHTML = 'Cargando...';
+  modalCaption.textContent = captions && captions[day] ? captions[day] : '';
+
+  // decide fuente: manifest -> local candidates
+  if(manifest && manifest[day]){
+    const m = manifest[day];
+    if(m.type==='youtube'){
+      modalBody.innerHTML = `<iframe width="100%" height="480" src="https://www.youtube.com/embed/${extractYoutubeID(m.src)}" frameborder="0" allowfullscreen></iframe>`;
+      return;
+    }
+    if(m.type==='video'){
+      modalBody.innerHTML = `<video controls playsinline style="width:100%;max-height:70vh"><source src="${m.src}">Tu navegador no soporta video</video>`; return;
+    }
+    if(m.type==='image'){
+      modalBody.innerHTML = `<img src="${m.src}" style="width:100%;height:auto">`; return;
+    }
+  }
+
+  // si no hay manifest, prueba archivos locales en /assets/
+  const candidates = [
+    `${ASSET_PATH}/day${day}.mp4`,
+    `${ASSET_PATH}/day${day}.webm`,
+    `${ASSET_PATH}/day${day}.jpg`,
+    `${ASSET_PATH}/day${day}.jpeg`,
+    `${ASSET_PATH}/day${day}.png`,
+    `${ASSET_PATH}/day${day}.gif`
+  ];
+
+  // busca el primer que exista
+  for(const c of candidates){
+    const ok = await exists(c);
+    if(ok){
+      if(c.endsWith('.mp4') || c.endsWith('.webm')){
+        modalBody.innerHTML = `<video controls playsinline style="width:100%;max-height:70vh"><source src="${c}">Tu navegador no soporta video</video>`;
+      } else {
+        modalBody.innerHTML = `<img src="${c}" style="width:100%;height:auto">`;
+      }
+      return;
+    }
+  }
+
+  modalBody.innerHTML = `<div class="small">No hay contenido para este día (sube <code>assets/day${day}.jpg</code> o añade manifest.json).</div>`;
+}
+
+// extra UI handlers
+document.getElementById('closeBtn').addEventListener('click', ()=>{
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('modal').setAttribute('aria-hidden','true');
+  document.getElementById('modalBody').innerHTML='';
+});
+document.getElementById('downloadBtn').addEventListener('click',()=>{
+  const media = document.getElementById('modalBody').querySelector('img,video,iframe');
+  if(!media) return;
+  let src = media.tagName.toLowerCase() === 'iframe' ? media.src : (media.tagName.toLowerCase()==='img' ? media.src : (media.querySelector('source') ? media.querySelector('source').src : media.src));
+  window.open(src, '_blank');
+});
+
+// helper YouTube ID extractor
+function extractYoutubeID(url){
+  // patterns cover youtu.be and standard watch?v=
+  const m = url.match(/(?:v=|\/embed\/|youtu\.be\/)([^&?\/\s]+)/);
+  return m ? m[1] : url;
+}
+</script>
+</body>
+</html>
+index.html
+assests/
+day1.mp4
+manifest.json
+"1": {"type":"youtube","src":"https://www.youtube.com/watch?v=0rH50v9jdnQ"}
+captions.json
+"1": "Adicta a la cocacola"
+day2.mp4
+day3.mp4
+day4.mp4
+day5.mp4
+day6.mp4
+day7.mp4
+day8.mp4
+day9.mp4
+day10.mp4
+day11.mp4
+day12.mp4
+day13.mp4
+day14.mp4
+day15.mp4
+day16.mp4
+day17.mp4
+day18.mp4
+day19.mp4
+day20.mp4
+day21.mp4
+day22.mp4
+day23.mp4
+day24.mp4
