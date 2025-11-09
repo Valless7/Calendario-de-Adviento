@@ -235,11 +235,35 @@ manifest.json
 captions.json
 "1": "Adicta a la cocacola"
 day2.mp4
+manifest.json
+"1!: {"type":"youtube","src":"https://www.youtube.com/watch?v=PrK8Vzk_ACU"}
+captions.json
+"1": "Malditp muñeco"
 day3.mp4
+manifest.json
+"1": {"type":"youtube","src":"https://www.youtube.com/watch?v=B7Lv18ZUIAQ"}
+captions.json
+"1": "Que me quedo sin comer"
 day4.mp4
+manifest.json
+"1": {"type":"youtube","src":"https://www.youtube.com/shorts/n49nJ0zb6fY"}
+captions.json
+"1": "Baptisterio romano"
 day5.mp4
+manifest.json
+"1": {"type":"youtube","src": "https://www.youtube.com/watch?v=iF9Z6AbcypM"}
+captions.json
+"1": "Estheeeer"
 day6.mp4
+manifest.json
+"1": {"type":"youtube","src": "https://www.youtube.com/watch?v=tB7eRjg34EI"}
+captions.json
+"1": "Ruge ya"
 day7.mp4
+manifest.json
+"1": {"type":"youtube","src": "https://www.youtube.com/watch?v=o4ja6-1wl3M"}
+captions.json
+"1": "Vecinas de valencia"
 day8.mp4
 day9.mp4
 day10.mp4
